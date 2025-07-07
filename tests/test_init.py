@@ -11,7 +11,7 @@ Test files for the proper package import check
 
 
 def test_package_import() -> None:
-    """Test that the potentiostat package can be imported."""
+    """Test that the potentiopipe package can be imported."""
     import potentiopipe
 
     assert hasattr(potentiopipe, "__version__")
