@@ -1,0 +1,24 @@
+repos:
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.7.19
+    hooks:
+      - id: uv-lock
+      - id: uv-export
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.9
+    hooks:
+      - id: ruff
+      - id: ruff-format
+  - repo: https://github.com/RobertCraigie/pyright-python
+    rev: v1.1.402
+    hooks:
+      - id: pyright
+  - repo: local
+    hooks:
+    - id: pytest
+      name: pytest
+      entry: uv run pytest tests
+      language: system
+      types: [ python ]
+      pass_filenames: false
+      always_run: true

@@ -1,0 +1,52 @@
+[project]
+name = "potentiopipe"
+version = "0.0.1"
+description = "Python library for data pipeline from a custom potentiostat."
+authors = [
+    { name = "Aurelien BLANC", email = "aurelien.blanc@utoronto.ca" }
+]
+readme = "README.md"
+license = { file="LICENSE" }
+keywords = ["potentiostat", "electrochemistry", "chronoamperometry", "chronopotentiometry"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Chemistry"
+]
+requires-python = ">=3.13"
+dependencies = [
+    "numpy>=2.2.6",
+    "matplotlib>=3.10.3",
+    "pandas>=2.3.0",
+    "scipy>=1.16.0",
+]
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.2.0",
+    "pyright>=1.1.402",
+    "pytest>=8.4.1",
+    "ruff>=0.12.0",
+]
+
+[build-system]
+requires = ["setuptools >= 80.9.0", ]
+build-backend = "setuptools.build_meta"
+
+
+[project.scripts]
+process_raw_cli = "potentiopipe.cli:process_raw_cli"
+peak_detection_proc_cli = "potentiopipe.cli:peak_detection_proc_cli"
+
+
+[tool.pyright]
+include = ["src"]
+exclude = [".venv"]
+venvPath = "."
+venv = ".venv"
+reportMissingImports = true
+reportMissingTypeStubs = false
+pythonVersion = "3.13"
+typeCheckingMode = "basic"
