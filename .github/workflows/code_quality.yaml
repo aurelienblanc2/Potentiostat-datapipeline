@@ -1,6 +1,16 @@
 name: Code Quality
 
-on: [push, pull_request]
+on:
+  push:
+    paths:
+      - src/**
+      - examples/**
+      - tests/**
+  pull_request:
+    paths:
+      - src/**
+      - examples/**
+      - tests/**
 
 jobs:
   lock-file:
