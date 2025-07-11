@@ -28,7 +28,7 @@ parameters_peak_detection = ParametersPeakDetection(
 
 def example_full_chain():
     folder_in = "data"
-    folder_out = "results"
+    folder_out = os.path.join("results", "example_full_chain")
     columns_raw_file = ["Time", "Voltage", "Current", "Cycle", "Dummy", "Reference"]
 
     if not os.path.isdir(folder_in):
