@@ -79,6 +79,7 @@ def plot_potentiostat_raw(
 
     # - Plot 1 - #
     # Plotting the raw data
+    plt.figure()
     plt.plot(df_raw.Time, df_raw.Voltage, "b")
 
     # Formating the plot
@@ -92,12 +93,13 @@ def plot_potentiostat_raw(
 
     # Display the plot or saving only
     if mode == "Display":
-        plt.show()
+        plt.show(block=False)
     else:
         plt.clf()
 
     # - Plot 2 - #
     # Plotting the raw data
+    plt.figure()
     plt.plot(df_raw.Voltage, df_raw.Current, "b")
 
     # Formating the plot
@@ -111,7 +113,7 @@ def plot_potentiostat_raw(
 
     # Display the plot or saving only
     if mode == "Display":
-        plt.show()
+        plt.show(block=False)
     else:
         plt.clf()
 
@@ -156,31 +158,37 @@ def plot_potentiostat_proc(
         raise TypeError("Input df_proc is not a DataFrame")
 
     # Checking that Time, Voltage, Current and Ramp are in the df_proc
-    if (
-        ("Time" not in df_proc.columns)
-        or ("Voltage" not in df_proc.columns)
-        or ("Current" not in df_proc.columns)
-        or ("Ramp" not in df_proc.columns)
-    ):
-        raise ValueError(
-            "df_proc does not contain 'Time', 'Voltage', 'Current' or 'Ramp'"
-        )
+    if len(df_proc) > 0:
+        if (
+            ("Time" not in df_proc.columns)
+            or ("Voltage" not in df_proc.columns)
+            or ("Current" not in df_proc.columns)
+            or ("Ramp" not in df_proc.columns)
+        ):
+            raise ValueError(
+                "df_proc does not contain 'Time', 'Voltage', 'Current' or 'Ramp'"
+            )
+    else:
+        print("WARNING : df_proc is empty")
 
     if not isinstance(df_peak, pd.DataFrame):
         raise TypeError("Input df_peak is not a DataFrame")
 
     # Checking that Time, Voltage, Current, Ramp, PeakQuality and Extremum are in the df_peak
-    if (
-        ("Time" not in df_peak.columns)
-        or ("Voltage" not in df_peak.columns)
-        or ("Current" not in df_peak.columns)
-        or ("Ramp" not in df_peak.columns)
-        or ("PeakQuality" not in df_peak.columns)
-        or ("Extremum" not in df_peak.columns)
-    ):
-        raise ValueError(
-            "df_peak does not contain 'Time', 'Voltage', 'Current', 'Ramp', 'PeakQuality' or 'Extremum'"
-        )
+    if len(df_peak) > 0:
+        if (
+            ("Time" not in df_peak.columns)
+            or ("Voltage" not in df_peak.columns)
+            or ("Current" not in df_peak.columns)
+            or ("Ramp" not in df_peak.columns)
+            or ("PeakQuality" not in df_peak.columns)
+            or ("Extremum" not in df_peak.columns)
+        ):
+            raise ValueError(
+                "df_peak does not contain 'Time', 'Voltage', 'Current', 'Ramp', 'PeakQuality' or 'Extremum'"
+            )
+    else:
+        print("WARNING : df_peak is empty")
 
     # Checking mode
     if (mode != "Display") and (mode != "Save") and (mode != "Both"):
@@ -207,14 +215,32 @@ def plot_potentiostat_proc(
     num_ramp = 0
 
     # Looping on the ramps
-    while len(df_proc[df_proc["Ramp"] == num_ramp]) > 0:
-        sub_df_proc = df_proc.loc[df_proc["Ramp"] == num_ramp]
-        sub_df_peak = df_peak.loc[df_peak["Ramp"] == num_ramp]
+    if len(df_proc) > 0:
+        while len(df_proc[df_proc["Ramp"] == num_ramp]) > 0:
+            sub_df_proc = df_proc.loc[df_proc["Ramp"] == num_ramp]
+            if len(df_peak) > 0:
+                sub_df_peak = df_peak.loc[df_peak["Ramp"] == num_ramp]
+            else:
+                sub_df_peak = df_peak
+            time_ramp = (df_proc[df_proc["Ramp"] == num_ramp]["Time"]).tolist()
+            start_time_ramp = time_ramp[0]
+            end_time_ramp = time_ramp[-1]
+            sub_df_raw = df_raw.loc[
+                (df_raw["Time"] >= start_time_ramp) & (df_raw["Time"] <= end_time_ramp)
+            ]
 
-        # Plotting the results on the ramp
-        _plot_ramp(sub_df_proc, sub_df_peak, mode, name, path_folder_out, num_ramp)
+            # Plotting the results on the ramp
+            _plot_ramp(
+                sub_df_raw,
+                sub_df_proc,
+                sub_df_peak,
+                mode,
+                name,
+                path_folder_out,
+                num_ramp,
+            )
 
-        num_ramp = num_ramp + 1
+            num_ramp = num_ramp + 1
 
 
 ########################
@@ -252,19 +278,21 @@ def _plot_cycle(
     os.makedirs(path_folder_out, exist_ok=True)
     path_file_out = os.path.join(path_folder_out, name)
 
-    list_time_sliced = list(df_proc.Time[df_proc.Ramp.diff().ne(0)])
-    list_time_sliced.append(df_proc.Time.iloc[-1])
-
     # - Plot 1 - #
     # Plotting the raw data
+    plt.figure()
     plt.plot(df_raw.Time, df_raw.Voltage, "b")
 
-    # Plotting the sliced index
-    for i in list_time_sliced:
-        if df_raw.Voltage[df_raw.Time == i].mean() > 0:
-            plt.plot(i, df_raw.Voltage[df_raw.Time == i].max(), "+r", markersize=20)
-        else:
-            plt.plot(i, df_raw.Voltage[df_raw.Time == i].min(), "+r", markersize=20)
+    if len(df_proc) > 0:
+        list_time_sliced = list(df_proc.Time[df_proc.Ramp.diff().ne(0)])
+        list_time_sliced.append(df_proc.Time.iloc[-1])
+
+        # Plotting the sliced index
+        for i in list_time_sliced:
+            if df_raw.Voltage[df_raw.Time == i].mean() > 0:
+                plt.plot(i, df_raw.Voltage[df_raw.Time == i].max(), "+r", markersize=20)
+            else:
+                plt.plot(i, df_raw.Voltage[df_raw.Time == i].min(), "+r", markersize=20)
 
     # Formating the plot
     plt.title(name)
@@ -276,38 +304,42 @@ def _plot_cycle(
     plt.savefig(path_file_out + "_VoltageRawSliced.png")
 
     # Display the plot or saving only
-    if mode == "Display":
-        plt.show()
+    if (mode == "Display") or (mode == "Both"):
+        plt.show(block=False)
     else:
         plt.clf()
 
     # - Plot 2 - #
     # Plotting the raw data
+    plt.figure()
     plt.plot(df_raw.Voltage, df_raw.Current, "b")
 
-    # Plotting the processed data
-    plt.plot(df_proc.Voltage, df_proc.Current, "r")
+    if len(df_proc) > 0:
+        # Plotting the processed data
+        plt.plot(df_proc.Voltage, df_proc.Current, "r")
 
-    # Plotting the detected peaks
-    plt.plot(df_peak.Voltage, df_peak.Current, "m+", markersize=12)
+        if len(df_peak) > 0:
+            # Plotting the detected peaks
+            plt.plot(df_peak.Voltage, df_peak.Current, "m+", markersize=12)
 
     # Formating the plot
     plt.title(name)
     plt.xlabel("Voltage")
     plt.ylabel("Current")
-    plt.legend(["Cycle", "Peaks"])
+    plt.legend(["Raw", "Smooth", "Peaks"])
 
     # Saving the plot
     plt.savefig(path_file_out + "_CycleSmoothPeaks.png")
 
     # Display the plot or saving only
     if (mode == "Display") or (mode == "Both"):
-        plt.show()
+        plt.show(block=False)
     else:
         plt.clf()
 
 
 def _plot_ramp(
+    df_raw: pd.DataFrame,
     df_proc: pd.DataFrame,
     df_peak: pd.DataFrame,
     mode: str,
@@ -322,6 +354,7 @@ def _plot_ramp(
 
     Args:
 
+        df_raw (type: pd.DataFrame) : Raw potentiostat data on the ramp
         df_proc (type: pd.DataFrame) : Processed potentiostat data on the ramp
         df_peak (type: pd.DataFrame) : Peaks in the processed potentiostat data on the ramp
         mode (type: str, optional) : 'Display' to display the figures, 'Save' to save them at path_folder_out or 'Both'
@@ -337,31 +370,36 @@ def _plot_ramp(
     os.makedirs(path_folder_out, exist_ok=True)
     path_file_out = os.path.join(path_folder_out, name)
 
+    # Plotting the raw data
+    plt.figure()
+    plt.plot(df_raw.Voltage, df_raw.Current, "b")
+
     # Plotting the processed data
     plt.plot(df_proc.Voltage, df_proc.Current, "r")
 
-    # Plotting the detected peaks
-    plt.plot(df_peak.Voltage, df_peak.Current, "m+", markersize=12)
+    if len(df_peak) > 0:
+        # Plotting the detected peaks
+        plt.plot(df_peak.Voltage, df_peak.Current, "m+", markersize=12)
 
-    # Adding the quality mark to the plot
-    for j in range(len(df_peak)):
-        plt.text(
-            df_peak.Voltage.iloc[j],
-            df_peak.Current.iloc[j],
-            str(round(df_peak.PeakQuality.iloc[j], 2)),
-        )
+        # Adding the quality mark to the plot
+        for j in range(len(df_peak)):
+            plt.text(
+                df_peak.Voltage.iloc[j],
+                df_peak.Current.iloc[j],
+                str(round(df_peak.PeakQuality.iloc[j], 2)),
+            )
 
     # Formating the plot
     plt.title(name + " Ramp " + str(num_ramp))
     plt.xlabel("Voltage")
     plt.ylabel("Current")
-    plt.legend(["Smooth", "Peaks"])
+    plt.legend(["Raw", "Smooth", "Peaks"])
 
     # Saving the plot
     plt.savefig(path_file_out + "_SmoothPeaks" + str(num_ramp) + ".png")
 
     # Display the plot or saving only
     if (mode == "Display") or (mode == "Both"):
-        plt.show()
+        plt.show(block=False)
     else:
         plt.clf()

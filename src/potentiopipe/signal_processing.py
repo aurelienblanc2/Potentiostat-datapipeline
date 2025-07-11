@@ -111,9 +111,7 @@ def peak_detection(
     # Main
     ######
     # Initialization of the DataFrame containing the peaks
-    df_peak = pd.DataFrame(columns=df.columns)
-    df_peak["PeakQuality"] = []
-    df_peak["Extremum"] = []
+    df_peak = pd.DataFrame()
 
     # Extracting the average unit_step of X
     unit_step = abs(df[series_name[0]].diff().dropna().mean())
@@ -174,7 +172,7 @@ def peak_detection(
                 dict_dec_max,
                 derivation_width_idx,
                 series_name[1],
-                "Min",
+                "Max",
             )
 
         # Extracting only the minimum
@@ -199,7 +197,7 @@ def peak_detection(
                 dict_inc_min,
                 derivation_width_idx,
                 series_name[1],
-                "Max",
+                "Min",
             )
 
     # Returning the DataFrame containing the detected peaks
@@ -567,7 +565,7 @@ def _extract_row_extremum(
             extremum_idx = np.argmin(df_window[name])
 
         # Extracting the row of the extremum
-        row_extremum = df_window.iloc[df_window.index == extremum_idx].copy()
+        row_extremum = df_window.iloc[extremum_idx : extremum_idx + 1].copy()
 
         # Sign of the derivation on the peak window
         mean_sign_derivation_before = df_derivation_sign[

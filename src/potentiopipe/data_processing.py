@@ -100,18 +100,20 @@ def process_raw(
         df_raw_ramp = df_raw.loc[(df_raw.index >= start_idx) & (df_raw.index < end_idx)]
 
         # Cleaning the artifacts on the Potentiostat datas
-        df_proc_ramp = _cleaning_raw(df_raw_ramp)
+        df_raw_ramp = _cleaning_raw(df_raw_ramp)
 
         # Size of the windows
-        window_savgol = int(smoothing_window_percentage * len(df_proc_ramp))
+        window_savgol = int(smoothing_window_percentage * len(df_raw_ramp))
+
+        df_proc_ramp = pd.DataFrame()
 
         # Smoothing of the Current and Voltage on the same window size
-        df_proc_ramp.Current = savgol_filter(df_proc_ramp.Current, window_savgol, 2)
-        df_proc_ramp.Voltage = savgol_filter(df_proc_ramp.Voltage, window_savgol, 2)
+        df_proc_ramp["Time"] = df_raw_ramp["Time"]
+        df_proc_ramp["Current"] = savgol_filter(df_raw_ramp.Current, window_savgol, 2)
+        df_proc_ramp["Voltage"] = savgol_filter(df_raw_ramp.Voltage, window_savgol, 2)
 
-        # Adding the ramp number to the processed DataFrame
-        ramp_series = [num_ramp for j in range(len(df_proc_ramp))]
-        df_proc_ramp["Ramp"] = ramp_series
+        # Adding the ramp number to the cleaned DataFrame
+        df_proc_ramp["Ramp"] = [num_ramp for j in range(len(df_proc_ramp))]
 
         # Storing the processed ramp in the output DataFrame
         df_proc = pd.concat([df_proc, df_proc_ramp], axis=0)
@@ -220,37 +222,46 @@ def _cleaning_raw(
         df_raw.Voltage[series_voltage_diff.abs() >= voltage_threshold].index
     )
 
-    # Case of decreasing ramp
-    if df_raw.Voltage.iloc[0] - df_raw.Voltage.iloc[-1] > 0:
-        # Meaning we started with going down, then it is not a full anomaly pattern
-        if (
-            series_voltage_diff[series_voltage_diff.index == idx_anomalies[0]].iloc[0]
-            < 0
-        ):
-            idx_anomalies = [int(series_voltage_diff.index[0])] + idx_anomalies
+    if len(idx_anomalies) > 0:
+        # Case of decreasing ramp
+        if df_raw.Voltage.iloc[0] - df_raw.Voltage.iloc[-1] > 0:
+            # Meaning we started with going down, then it is not a full anomaly pattern
+            if (
+                series_voltage_diff[series_voltage_diff.index == idx_anomalies[0]].iloc[
+                    0
+                ]
+                < 0
+            ):
+                idx_anomalies = [int(series_voltage_diff.index[0])] + idx_anomalies
 
-        # Meaning we finished with going up, then it is not a full anomaly pattern
-        if (
-            series_voltage_diff[series_voltage_diff.index == idx_anomalies[-1]].iloc[0]
-            > 0
-        ):
-            idx_anomalies = idx_anomalies + [int(series_voltage_diff.index[-1])]
+            # Meaning we finished with going up, then it is not a full anomaly pattern
+            if (
+                series_voltage_diff[
+                    series_voltage_diff.index == idx_anomalies[-1]
+                ].iloc[0]
+                > 0
+            ):
+                idx_anomalies = idx_anomalies + [int(series_voltage_diff.index[-1])]
 
-    # Case of increasing ramp
-    else:
-        # Meaning we started with going up, then it is not a full anomaly pattern
-        if (
-            series_voltage_diff[series_voltage_diff.index == idx_anomalies[0]].iloc[0]
-            > 0
-        ):
-            idx_anomalies = [int(series_voltage_diff.index[0])] + idx_anomalies
+        # Case of increasing ramp
+        else:
+            # Meaning we started with going up, then it is not a full anomaly pattern
+            if (
+                series_voltage_diff[series_voltage_diff.index == idx_anomalies[0]].iloc[
+                    0
+                ]
+                > 0
+            ):
+                idx_anomalies = [int(series_voltage_diff.index[0])] + idx_anomalies
 
-        # Meaning we finished with going down, then it is not a full anomaly pattern
-        if (
-            series_voltage_diff[series_voltage_diff.index == idx_anomalies[-1]].iloc[0]
-            < 0
-        ):
-            idx_anomalies = idx_anomalies + [int(series_voltage_diff.index[-1])]
+            # Meaning we finished with going down, then it is not a full anomaly pattern
+            if (
+                series_voltage_diff[
+                    series_voltage_diff.index == idx_anomalies[-1]
+                ].iloc[0]
+                < 0
+            ):
+                idx_anomalies = idx_anomalies + [int(series_voltage_diff.index[-1])]
 
     # To account for imperfect slicing caused by the anomaly, and the possibility of detecting the anomaly pattern
     # in the next ramp
