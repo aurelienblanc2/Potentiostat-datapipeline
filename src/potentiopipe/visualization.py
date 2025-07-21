@@ -147,12 +147,13 @@ def plot_potentiostat_proc(
         raise TypeError("Input df_raw is not a DataFrame")
 
     # Checking that Time, Voltage and Current are in the df_raw
-    if (
-        ("Time" not in df_raw.columns)
-        or ("Voltage" not in df_raw.columns)
-        or ("Current" not in df_raw.columns)
-    ):
-        raise ValueError("df_raw does not contain 'Time', 'Voltage' or 'Current'")
+    if len(df_raw) > 0:
+        if (
+            ("Time" not in df_raw.columns)
+            or ("Voltage" not in df_raw.columns)
+            or ("Current" not in df_raw.columns)
+        ):
+            raise ValueError("df_raw does not contain 'Time', 'Voltage' or 'Current'")
 
     if not isinstance(df_proc, pd.DataFrame):
         raise TypeError("Input df_proc is not a DataFrame")
@@ -225,9 +226,13 @@ def plot_potentiostat_proc(
             time_ramp = (df_proc[df_proc["Ramp"] == num_ramp]["Time"]).tolist()
             start_time_ramp = time_ramp[0]
             end_time_ramp = time_ramp[-1]
-            sub_df_raw = df_raw.loc[
-                (df_raw["Time"] >= start_time_ramp) & (df_raw["Time"] <= end_time_ramp)
-            ]
+            if len(df_raw) > 0:
+                sub_df_raw = df_raw.loc[
+                    (df_raw["Time"] >= start_time_ramp)
+                    & (df_raw["Time"] <= end_time_ramp)
+                ]
+            else:
+                sub_df_raw = df_raw
 
             # Plotting the results on the ramp
             _plot_ramp(
@@ -279,40 +284,46 @@ def _plot_cycle(
     path_file_out = os.path.join(path_folder_out, name)
 
     # - Plot 1 - #
-    # Plotting the raw data
-    plt.figure()
-    plt.plot(df_raw.Time, df_raw.Voltage, "b")
+    if len(df_raw) > 0:
+        # Plotting the raw data
+        plt.figure()
+        plt.plot(df_raw.Time, df_raw.Voltage, "b")
 
-    if len(df_proc) > 0:
-        list_time_sliced = list(df_proc.Time[df_proc.Ramp.diff().ne(0)])
-        list_time_sliced.append(df_proc.Time.iloc[-1])
+        if len(df_proc) > 0:
+            list_time_sliced = list(df_proc.Time[df_proc.Ramp.diff().ne(0)])
+            list_time_sliced.append(df_proc.Time.iloc[-1])
 
-        # Plotting the sliced index
-        for i in list_time_sliced:
-            if df_raw.Voltage[df_raw.Time == i].mean() > 0:
-                plt.plot(i, df_raw.Voltage[df_raw.Time == i].max(), "+r", markersize=20)
-            else:
-                plt.plot(i, df_raw.Voltage[df_raw.Time == i].min(), "+r", markersize=20)
+            # Plotting the sliced index
+            for i in list_time_sliced:
+                if df_raw.Voltage[df_raw.Time == i].mean() > 0:
+                    plt.plot(
+                        i, df_raw.Voltage[df_raw.Time == i].max(), "+r", markersize=20
+                    )
+                else:
+                    plt.plot(
+                        i, df_raw.Voltage[df_raw.Time == i].min(), "+r", markersize=20
+                    )
 
-    # Formating the plot
-    plt.title(name)
-    plt.xlabel("Time")
-    plt.ylabel("Voltage")
-    plt.legend(["Raw", "Sliced"])
+        # Formating the plot
+        plt.title(name)
+        plt.xlabel("Time")
+        plt.ylabel("Voltage")
+        plt.legend(["Raw", "Sliced"])
 
-    # Saving the plot
-    plt.savefig(path_file_out + "_VoltageRawSliced.png")
+        # Saving the plot
+        plt.savefig(path_file_out + "_VoltageRawSliced.png")
 
-    # Display the plot or saving only
-    if (mode == "Display") or (mode == "Both"):
-        plt.show(block=False)
-    else:
-        plt.clf()
+        # Display the plot or saving only
+        if (mode == "Display") or (mode == "Both"):
+            plt.show(block=False)
+        else:
+            plt.clf()
 
     # - Plot 2 - #
     # Plotting the raw data
     plt.figure()
-    plt.plot(df_raw.Voltage, df_raw.Current, "b")
+    if len(df_raw) > 0:
+        plt.plot(df_raw.Voltage, df_raw.Current, "b")
 
     if len(df_proc) > 0:
         # Plotting the processed data
@@ -326,7 +337,10 @@ def _plot_cycle(
     plt.title(name)
     plt.xlabel("Voltage")
     plt.ylabel("Current")
-    plt.legend(["Raw", "Smooth", "Peaks"])
+    if len(df_raw) > 0:
+        plt.legend(["Raw", "Smooth", "Peaks"])
+    else:
+        plt.legend(["Smooth", "Peaks"])
 
     # Saving the plot
     plt.savefig(path_file_out + "_CycleSmoothPeaks.png")
@@ -372,7 +386,8 @@ def _plot_ramp(
 
     # Plotting the raw data
     plt.figure()
-    plt.plot(df_raw.Voltage, df_raw.Current, "b")
+    if len(df_raw) > 0:
+        plt.plot(df_raw.Voltage, df_raw.Current, "b")
 
     # Plotting the processed data
     plt.plot(df_proc.Voltage, df_proc.Current, "r")
@@ -393,7 +408,10 @@ def _plot_ramp(
     plt.title(name + " Ramp " + str(num_ramp))
     plt.xlabel("Voltage")
     plt.ylabel("Current")
-    plt.legend(["Raw", "Smooth", "Peaks"])
+    if len(df_raw) > 0:
+        plt.legend(["Raw", "Smooth", "Peaks"])
+    else:
+        plt.legend(["Smooth", "Peaks"])
 
     # Saving the plot
     plt.savefig(path_file_out + "_SmoothPeaks" + str(num_ramp) + ".png")

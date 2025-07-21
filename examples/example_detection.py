@@ -4,7 +4,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from potentiopipe import (
-    process_raw,
     peak_detection_proc,
     plot_potentiostat_proc,
     ParametersPeakDetection,
@@ -12,10 +11,10 @@ from potentiopipe import (
 
 
 # Peak Detection
-half_width_min = 0.1  # Volt
-width_max = 0.3  # Volt
+half_width_min = 0.05  # Volt
+width_max = 0.15  # Volt
 derivation_width = 0.05  # Volt
-derivation_sensitivity = 0.00000002  # Ampere/Volt
+derivation_sensitivity = 0.0000001  # Ampere/Volt   0.0000003 => only one peak
 
 # Default values of the Named tuple of the parameters
 parameters_peak_detection = ParametersPeakDetection(
@@ -26,14 +25,14 @@ parameters_peak_detection = ParametersPeakDetection(
 )
 
 
-def example_full_chain():
+def example_detection():
+    name_example = "example_detection"
     folder_in = "data"
-    name_example = "example_full_chain"
     folder_out = os.path.join("results", name_example)
     if not os.path.isdir(folder_out):
         os.makedirs(folder_out)
 
-    columns_raw_file = ["Time", "Voltage", "Current", "Cycle", "Dummy", "Reference"]
+    df_raw = pd.DataFrame()
 
     if not os.path.isdir(folder_in):
         print("Input folder does not exist")
@@ -42,20 +41,15 @@ def example_full_chain():
         list_files = os.listdir(folder_in)
 
     for file in list_files:
-        if "raw" in file:
+        if "proc" in file:
             file_path = os.path.join(folder_in, file)
-            df_raw = pd.read_csv(
-                file_path, header=None, na_values="NAN", names=columns_raw_file
-            )
+            df_proc = pd.read_csv(file_path, header=0, na_values="NAN")
 
-            df_proc = process_raw(df_raw)
             df_peak = peak_detection_proc(df_proc, parameters_peak_detection)
 
-            path_out_proc = os.path.join(folder_out, "proc_" + file)
             path_out_peak = os.path.join(folder_out, "peak_" + file)
 
             # Save the processed Data
-            df_proc.to_csv(path_out_proc, index=False)
             df_peak.to_csv(path_out_peak, index=False)
 
             # Plotting the results
@@ -72,4 +66,4 @@ def example_full_chain():
 
 
 if __name__ == "__main__":
-    example_full_chain()
+    example_detection()
