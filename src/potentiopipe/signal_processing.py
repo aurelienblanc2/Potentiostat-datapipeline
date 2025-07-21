@@ -356,15 +356,11 @@ def _merge_neighbor_idx(
                 dict1[str(new_idx)] = min(
                     dict1[str(list_idx[cpt])], dict1[str(list_idx[cpt + 1])]
                 )
-                dict1.pop(str(list_idx[cpt]))
-                dict1.pop(str(list_idx[cpt + 1]))
 
             if dict2 is not None:
                 dict2[str(new_idx)] = max(
                     dict2[str(list_idx[cpt])], dict2[str(list_idx[cpt + 1])]
                 )
-                dict2.pop(str(list_idx[cpt]))
-                dict2.pop(str(list_idx[cpt + 1]))
 
             list_idx[cpt] = new_idx
             list_idx.pop(cpt + 1)
@@ -466,7 +462,7 @@ def _find_candidate_extremum(
             if (zero - idx1) < 0:
                 break
 
-            if ((zero - idx1) <= width_max_idx) and ((zero - idx1) > 0):
+            if ((zero - idx1) <= width_max_idx) and ((zero - idx1) >= 0):
                 b_valid_idx1 = 1
                 dict1[str(zero)] = idx1
 
@@ -492,14 +488,20 @@ def _find_candidate_extremum(
                 dict2[str(zero)] = zero + half_width_min_idx
 
             # Before the index Y should globally increase, after it should globally decrease : at least one of the condition should be fulfilled (peak flat on one side )
-            mean_sign_derivation_before = df_derivation_sign[
-                (df_derivation_sign.index >= dict1[str(zero)])
-                & (df_derivation_sign.index < zero)
-            ].mean()
-            mean_sign_derivation_after = df_derivation_sign[
-                (df_derivation_sign.index > zero)
-                & (df_derivation_sign.index <= dict2[str(zero)])
-            ].mean()
+            if dict1[str(zero)] == zero:
+                mean_sign_derivation_before = df_derivation_sign[zero - 1]
+            else:
+                mean_sign_derivation_before = df_derivation_sign[
+                    (df_derivation_sign.index >= dict1[str(zero)])
+                    & (df_derivation_sign.index < zero)
+                ].mean()
+            if dict2[str(zero)] == zero:
+                mean_sign_derivation_after = df_derivation_sign[zero]
+            else:
+                mean_sign_derivation_after = df_derivation_sign[
+                    (df_derivation_sign.index > zero)
+                    & (df_derivation_sign.index <= dict2[str(zero)])
+                ].mean()
 
             if (
                 (mean_sign_derivation_before > monotonicity_sensitivity_1)
