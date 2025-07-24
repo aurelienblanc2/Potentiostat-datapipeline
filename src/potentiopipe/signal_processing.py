@@ -569,6 +569,11 @@ def _extract_row_extremum(
         # Extracting the row of the extremum
         row_extremum = df_window.iloc[extremum_idx : extremum_idx + 1].copy()
 
+        # Avoiding double detection on one peak
+        if len(df_peak) > 0:
+            if (df_peak[row_extremum.columns] == row_extremum.values).all(axis=1).any():
+                continue
+
         # Sign of the derivation on the peak window
         mean_sign_derivation_before = df_derivation_sign[
             (df_derivation_sign.index >= start_window_idx + derivation_width_idx)

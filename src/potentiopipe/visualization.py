@@ -51,8 +51,12 @@ def plot_potentiostat_raw(
         raise TypeError("Input df_raw is not a DataFrame")
 
     # Checking that Voltage and Current are in the df_raw
-    if ("Voltage" not in df_raw.columns) or ("Current" not in df_raw.columns):
-        raise ValueError("df_raw does not contain 'Voltage' or 'Current'")
+    if (
+        ("Voltage" not in df_raw.columns)
+        or ("Current" not in df_raw.columns)
+        or ("Time" not in df_raw.columns)
+    ):
+        raise ValueError("df_raw does not contain 'Voltage', 'Current' or 'Time")
 
     # Checking mode
     if (mode != "Display") and (mode != "Save") and (mode != "Both"):

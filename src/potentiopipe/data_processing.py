@@ -76,8 +76,12 @@ def process_raw(
         raise TypeError("Input df_raw is not a DataFrame")
 
     # Checking that Voltage and Current are in the DataFrame
-    if ("Voltage" not in df_raw.columns) or ("Current" not in df_raw.columns):
-        raise ValueError("df_raw does not contain 'Voltage' or 'Current'")
+    if (
+        ("Voltage" not in df_raw.columns)
+        or ("Current" not in df_raw.columns)
+        or ("Time" not in df_raw.columns)
+    ):
+        raise ValueError("df_raw does not contain 'Voltage', 'Current' or 'Time'")
 
     # Main
     ######
@@ -156,6 +160,10 @@ def peak_detection_proc(
         or ("Ramp" not in df_proc.columns)
     ):
         raise ValueError("df_proc does not contain 'Voltage', 'Current' or 'Ramp'")
+
+    # Remove unwanted column if it exists
+    if "Unnamed: 0" in df_proc.columns:
+        df_proc.drop(columns=["Unnamed: 0"], inplace=True)
 
     # Main
     ######
