@@ -104,6 +104,11 @@ def peak_detection(
     if parameters.width_max < parameters.half_width_min:
         raise ValueError("parameters : width_max must be greater than half_width_min")
 
+    if parameters.half_width_min < parameters.derivation_width:
+        raise ValueError(
+            "parameters : half_width_min must be greater than derivation_width"
+        )
+
     # Checking the consistency of df
     if len(df) < parameters.width_max:
         raise ValueError("Not enough elements in df compared to parameters.width_max")
@@ -152,16 +157,25 @@ def peak_detection(
     if (len(zero_idx) != 0) and ((len(inc_idx) != 0) or (len(dec_idx) != 0)):
         # Extracting only the maximum
         if b_max:
-            peak_idx_max, dict_inc_max, dict_dec_max = _find_candidate_extremum(
-                zero_idx,
-                inc_idx,
-                dec_idx,
-                width_max_idx,
-                half_width_min_idx,
-                df_derivation_sign,
+            peak_idx_max, dict_inc_max, dict_dec_max, dict_quality = (
+                _find_candidate_extremum(
+                    zero_idx,
+                    inc_idx,
+                    dec_idx,
+                    width_max_idx,
+                    half_width_min_idx,
+                    df_derivation_sign,
+                    "Max",
+                )
             )
-            peak_idx_max = _merge_neighbor_idx(
-                peak_idx_max, half_width_min_idx, dict_inc_max, dict_dec_max
+            peak_idx_max, dict_inc_max, dict_dec_max, dict_quality = (
+                _merge_neighbor_idx(
+                    peak_idx_max,
+                    half_width_min_idx,
+                    dict_inc_max,
+                    dict_dec_max,
+                    dict_quality,
+                )
             )
             df_peak = _extract_row_extremum(
                 df,
@@ -170,23 +184,34 @@ def peak_detection(
                 peak_idx_max,
                 dict_inc_max,
                 dict_dec_max,
+                dict_quality,
                 derivation_width_idx,
+                half_width_min_idx,
                 series_name[1],
                 "Max",
             )
 
         # Extracting only the minimum
         if b_min:
-            peak_idx_min, dict_dec_min, dict_inc_min = _find_candidate_extremum(
-                zero_idx,
-                dec_idx,
-                inc_idx,
-                width_max_idx,
-                half_width_min_idx,
-                df_derivation_sign,
+            peak_idx_min, dict_dec_min, dict_inc_min, dict_quality = (
+                _find_candidate_extremum(
+                    zero_idx,
+                    dec_idx,
+                    inc_idx,
+                    width_max_idx,
+                    half_width_min_idx,
+                    df_derivation_sign,
+                    "Min",
+                )
             )
-            peak_idx_min = _merge_neighbor_idx(
-                peak_idx_min, half_width_min_idx, dict_dec_min, dict_inc_min
+            peak_idx_min, dict_dec_min, dict_inc_min, dict_quality = (
+                _merge_neighbor_idx(
+                    peak_idx_min,
+                    half_width_min_idx,
+                    dict_dec_min,
+                    dict_inc_min,
+                    dict_quality,
+                )
             )
             df_peak = _extract_row_extremum(
                 df,
@@ -195,7 +220,9 @@ def peak_detection(
                 peak_idx_min,
                 dict_dec_min,
                 dict_inc_min,
+                dict_quality,
                 derivation_width_idx,
+                half_width_min_idx,
                 series_name[1],
                 "Min",
             )
@@ -321,14 +348,15 @@ def slicing_ramp(df: pd.DataFrame, series_name: str) -> List[int]:
 def _merge_neighbor_idx(
     list_idx: List[int],
     distance: int,
-    dict1: dict | None = None,
-    dict2: dict | None = None,
-) -> List[int]:
+    dict1: dict[str, int],
+    dict2: dict[str, int],
+    dict3: dict[str, float],
+) -> tuple[List[int], dict[str, int], dict[str, int], dict[str, float]]:
     """
     Description :
 
         Merge the indices in list_idx that are within distance of each other.
-        Also update the associated dictionaries dict1 and dict2, if they exist
+        Also update the associated dictionaries dict1, dict2 and dict3 if they exist
 
     Args:
 
@@ -336,10 +364,14 @@ def _merge_neighbor_idx(
         distance (type: int) : minimal distance between neighboring indices
         dict1 (type : dict) : Dictionary with index as key
         dict2 (type : dict) : Dictionary with index as key
+        dict3 (type: dict) : Dictionary with index as key
 
     Returns:
 
         list_idx (type: List[int]) : List of the indices merged
+        dict1 (type : dict) : Updated Dictionary
+        dict2 (type : dict) : Updated Dictionary
+        dict3 (type: dict) : Updated Dictionary
     """
 
     # Main
@@ -352,15 +384,13 @@ def _merge_neighbor_idx(
         if (list_idx[cpt + 1] - list_idx[cpt]) <= distance:
             new_idx = int((list_idx[cpt + 1] + list_idx[cpt]) // 2)
 
-            if dict1 is not None:
-                dict1[str(new_idx)] = min(
-                    dict1[str(list_idx[cpt])], dict1[str(list_idx[cpt + 1])]
-                )
-
-            if dict2 is not None:
-                dict2[str(new_idx)] = max(
-                    dict2[str(list_idx[cpt])], dict2[str(list_idx[cpt + 1])]
-                )
+            dict1[str(new_idx)] = min(
+                dict1[str(list_idx[cpt])], dict1[str(list_idx[cpt + 1])]
+            )
+            dict2[str(new_idx)] = max(
+                dict2[str(list_idx[cpt])], dict2[str(list_idx[cpt + 1])]
+            )
+            dict3[str(new_idx)] = -1
 
             list_idx[cpt] = new_idx
             list_idx.pop(cpt + 1)
@@ -369,7 +399,7 @@ def _merge_neighbor_idx(
         else:
             cpt += 1
 
-    return list_idx
+    return list_idx, dict1, dict2, dict3
 
 
 def _non_consecutive_idx(df: pd.DataFrame) -> List[int]:
@@ -384,7 +414,7 @@ def _non_consecutive_idx(df: pd.DataFrame) -> List[int]:
 
     Returns:
 
-        idx (type: List[int]) : List of the indices
+        idx (type: List[int]) : List of the indices sorted
     """
 
     # Main
@@ -399,10 +429,8 @@ def _non_consecutive_idx(df: pd.DataFrame) -> List[int]:
     idx = idx + df[df.index.diff() > 1].index.tolist()
     idx = idx + df[df.index.diff(periods=-1) < -1].index.tolist()
 
-    # Sorting them for faster calculation later
-    idx.sort()
-
-    return idx
+    # Sorting them for faster calculation later and removing duplicates
+    return sorted(list(set(idx)))
 
 
 def _find_candidate_extremum(
@@ -412,7 +440,8 @@ def _find_candidate_extremum(
     width_max_idx: int,
     half_width_min_idx: int,
     df_derivation_sign: pd.DataFrame,
-) -> tuple[List[int], dict, dict]:
+    type_extremum: str,
+) -> tuple[List[int], dict[str, int], dict[str, int], dict[str, float]]:
     """
     Description :
 
@@ -428,6 +457,7 @@ def _find_candidate_extremum(
         width_max_idx (type: int) : Maximum width of the peak to be detected
         half_width_min_idx (type: int) : Minimum half width of the peak to be detected
         df_derivation_sign (type: pd.DataFrame) : Sign of the derivative for the detection
+        type_extremum (type: str) : Type of the extremum ("Max" or "Min")
 
     Returns:
 
@@ -436,6 +466,7 @@ def _find_candidate_extremum(
                              as value
         dict2 (type: dict) : Dictionary with index of the peak as key and index of the derivative over the threshold
                              as value
+        dict_quality (type: dict) : Dictionary with index of the peak as key and quality mark of the derivative as value
     """
 
     # Main
@@ -448,6 +479,7 @@ def _find_candidate_extremum(
     # Initialization
     dict1 = {}
     dict2 = {}
+    dict_quality = {}
     peak_idx = []
 
     # For each zero_idx we want at least one side of the peaks to have a derivation dynamic > derivation_sensitivity
@@ -488,6 +520,7 @@ def _find_candidate_extremum(
                 dict2[str(zero)] = zero + half_width_min_idx
 
             # Before the index Y should globally increase, after it should globally decrease : at least one of the condition should be fulfilled (peak flat on one side )
+            # TODO : handle of the consecutive index ? To be tested
             if dict1[str(zero)] == zero:
                 mean_sign_derivation_before = df_derivation_sign[zero - 1]
             else:
@@ -495,25 +528,40 @@ def _find_candidate_extremum(
                     (df_derivation_sign.index >= dict1[str(zero)])
                     & (df_derivation_sign.index < zero)
                 ].mean()
-            if dict2[str(zero)] == zero:
-                mean_sign_derivation_after = df_derivation_sign[zero]
+
+            mean_sign_derivation_after = df_derivation_sign[
+                (df_derivation_sign.index >= zero)
+                & (df_derivation_sign.index <= dict2[str(zero)])
+            ].mean()
+
+            if type_extremum == "Max":
+                if (
+                    (mean_sign_derivation_before > monotonicity_sensitivity_1)
+                    and (mean_sign_derivation_after < -monotonicity_sensitivity_2)
+                ) or (
+                    (mean_sign_derivation_before > monotonicity_sensitivity_2)
+                    and (mean_sign_derivation_after < -monotonicity_sensitivity_1)
+                ):
+                    # The candidate become a valid peak
+                    peak_idx.append(zero)
+                    dict_quality[str(zero)] = abs(
+                        mean_sign_derivation_after * mean_sign_derivation_before
+                    )
             else:
-                mean_sign_derivation_after = df_derivation_sign[
-                    (df_derivation_sign.index > zero)
-                    & (df_derivation_sign.index <= dict2[str(zero)])
-                ].mean()
+                if (
+                    (mean_sign_derivation_after > monotonicity_sensitivity_1)
+                    and (mean_sign_derivation_before < -monotonicity_sensitivity_2)
+                ) or (
+                    (mean_sign_derivation_after > monotonicity_sensitivity_2)
+                    and (mean_sign_derivation_before < -monotonicity_sensitivity_1)
+                ):
+                    # The candidate become a valid peak
+                    peak_idx.append(zero)
+                    dict_quality[str(zero)] = abs(
+                        mean_sign_derivation_after * mean_sign_derivation_before
+                    )
 
-            if (
-                (mean_sign_derivation_before > monotonicity_sensitivity_1)
-                and (mean_sign_derivation_after < -monotonicity_sensitivity_2)
-            ) or (
-                (mean_sign_derivation_before > monotonicity_sensitivity_2)
-                and (mean_sign_derivation_after < -monotonicity_sensitivity_1)
-            ):
-                # The candidate become a valid peak
-                peak_idx.append(zero)
-
-    return peak_idx, dict1, dict2
+    return peak_idx, dict1, dict2, dict_quality
 
 
 def _extract_row_extremum(
@@ -521,9 +569,11 @@ def _extract_row_extremum(
     df_derivation_sign: pd.DataFrame,
     df_peak: pd.DataFrame,
     peak_idx: List[int],
-    dict1: dict,
-    dict2: dict,
+    dict1: dict[str, int],
+    dict2: dict[str, int],
+    dict_quality: dict[str, float],
     derivation_width_idx: int,
+    half_width_min_idx: int,
     name: str,
     type_extremum: str,
 ) -> pd.DataFrame:
@@ -540,7 +590,9 @@ def _extract_row_extremum(
         peak_idx (type: List[int]) : List with indices of the peaks
         dict1 (type: dict) : Dictionary with the peak index as the key and the window start index as the value
         dict2 (type: dict) : Dictionary with the peak index as the key and the window end index as the value
+        dict_quality (type: dict) : Dictionary with index of the peak as key and quality mark of the derivative as value
         derivation_width_idx (type: int) : Horizon on which the derivation is performed
+        half_width_min_idx (type: int) : Minimum half width of the peak to be detected
         name (type: str) : Name of the series in which to find the peak
         type_extremum (type: str) : Type of the extremum ("Max" or "Min")
 
@@ -562,38 +614,79 @@ def _extract_row_extremum(
         df_window = df[(df.index >= start_window_idx) & (df.index <= end_window_idx)]
 
         if type_extremum == "Max":
-            extremum_idx = np.argmax(df_window[name])
+            extremum_window_idx = np.argmax(df_window[name])
         else:
-            extremum_idx = np.argmin(df_window[name])
+            extremum_window_idx = np.argmin(df_window[name])
 
         # Extracting the row of the extremum
-        row_extremum = df_window.iloc[extremum_idx : extremum_idx + 1].copy()
+        row_extremum = df_window.iloc[
+            extremum_window_idx : extremum_window_idx + 1
+        ].copy()
 
         # Avoiding double detection on one peak
         if len(df_peak) > 0:
             if (df_peak[row_extremum.columns] == row_extremum.values).all(axis=1).any():
                 continue
 
-        # Sign of the derivation on the peak window
-        mean_sign_derivation_before = df_derivation_sign[
-            (df_derivation_sign.index >= start_window_idx + derivation_width_idx)
-            & (df_derivation_sign.index < i)
-        ].mean()
-        mean_sign_derivation_after = df_derivation_sign[
-            (df_derivation_sign.index >= i)
-            & (df_derivation_sign.index <= end_window_idx)
-        ].mean()
+        if dict_quality[str(i)] > 0:
+            quality_mark_derivation = dict_quality[str(i)]
+        else:
+            if start_window_idx == i:
+                mean_sign_derivation_before = df_derivation_sign[i - 1]
+            else:
+                # Sign of the derivation on the peak detection window
+                mean_sign_derivation_before = df_derivation_sign[
+                    (
+                        df_derivation_sign.index
+                        >= start_window_idx + derivation_width_idx
+                    )
+                    & (df_derivation_sign.index < i)
+                ].mean()
+
+            mean_sign_derivation_after = df_derivation_sign[
+                (df_derivation_sign.index >= i)
+                & (df_derivation_sign.index <= end_window_idx)
+            ].mean()
+
+            quality_mark_derivation = abs(
+                mean_sign_derivation_before * mean_sign_derivation_after
+            )
+
+        # Window for noise quality mark
+        extremum_idx = row_extremum.index[0]
+        start_window_noise_idx = extremum_idx - half_width_min_idx
+        end_window_noise_idx = extremum_idx + half_width_min_idx
+
+        window_noise_before = pd.Series(
+            df[(df.index >= start_window_noise_idx) & (df.index <= extremum_idx)][name]
+        )
+
+        window_noise_after = pd.Series(
+            df[(df.index >= extremum_idx) & (df.index <= end_window_noise_idx)][name]
+        )
+
+        mean_sign_derivation_noise_before = (
+            np.sign(window_noise_before.diff().dropna())
+        ).mean()
+
+        mean_sign_derivation_noise_after = (
+            np.sign(window_noise_after.diff().dropna())
+        ).mean()
+
+        # The quality metric related to the noise ranges from 0.5 to 1. In the worst case, it can at most reduce the
+        # other term by half.
+        quality_mark_noise = 0.5 + 0.5 * abs(
+            mean_sign_derivation_noise_before * mean_sign_derivation_noise_after
+        )
 
         # Quality Mark is based on the fluctuation of the derivation before and after the zero
         # it takes into account smoothness of the signal (on the derivation horizon) and sharpness of the peak
         # TODO : Add a mark about peak height and smoothness of original signal ? Peak window seems really zoomed
         #  to really assess height and for sign of derivation to have a real impact on the quality mark
-        quality_mark_derivation = abs(
-            mean_sign_derivation_before * mean_sign_derivation_after
-        )
+        quality_mark = quality_mark_derivation * quality_mark_noise
 
         # Adding the Quality Mark to the row of the extremum
-        row_extremum["PeakQuality"] = quality_mark_derivation  # * DeltaExtremumWindow
+        row_extremum["PeakQuality"] = quality_mark
         row_extremum["Extremum"] = type_extremum
 
         # Storing the row of the extremum in the DataFrame
