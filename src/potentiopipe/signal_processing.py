@@ -10,6 +10,7 @@ Nested functions:
     _non_consecutive_idx
     _find_candidate_extremum
     _extract_row_extremum
+    _quality_mark_peak
 """
 
 
@@ -628,68 +629,179 @@ def _extract_row_extremum(
             if (df_peak[row_extremum.columns] == row_extremum.values).all(axis=1).any():
                 continue
 
-        if dict_quality[str(i)] > 0:
-            quality_mark_derivation = dict_quality[str(i)]
-        else:
-            if start_window_idx == i:
-                mean_sign_derivation_before = df_derivation_sign[i - 1]
-            else:
-                # Sign of the derivation on the peak detection window
-                mean_sign_derivation_before = df_derivation_sign[
-                    (
-                        df_derivation_sign.index
-                        >= start_window_idx + derivation_width_idx
-                    )
-                    & (df_derivation_sign.index < i)
-                ].mean()
-
-            mean_sign_derivation_after = df_derivation_sign[
-                (df_derivation_sign.index >= i)
-                & (df_derivation_sign.index <= end_window_idx)
-            ].mean()
-
-            quality_mark_derivation = abs(
-                mean_sign_derivation_before * mean_sign_derivation_after
-            )
-
-        # Window for noise quality mark
-        extremum_idx = row_extremum.index[0]
-        start_window_noise_idx = extremum_idx - half_width_min_idx
-        end_window_noise_idx = extremum_idx + half_width_min_idx
-
-        window_noise_before = pd.Series(
-            df[(df.index >= start_window_noise_idx) & (df.index <= extremum_idx)][name]
-        )
-
-        window_noise_after = pd.Series(
-            df[(df.index >= extremum_idx) & (df.index <= end_window_noise_idx)][name]
-        )
-
-        mean_sign_derivation_noise_before = (
-            np.sign(window_noise_before.diff().dropna())
-        ).mean()
-
-        mean_sign_derivation_noise_after = (
-            np.sign(window_noise_after.diff().dropna())
-        ).mean()
-
-        # The quality metric related to the noise ranges from 0.5 to 1. In the worst case, it can at most reduce the
-        # other term by half.
-        quality_mark_noise = 0.5 + 0.5 * abs(
-            mean_sign_derivation_noise_before * mean_sign_derivation_noise_after
-        )
-
-        # Quality Mark is based on the fluctuation of the derivation before and after the zero
-        # it takes into account smoothness of the signal (on the derivation horizon) and sharpness of the peak
-        # TODO : Add a mark about peak height and smoothness of original signal ? Peak window seems really zoomed
-        #  to really assess height and for sign of derivation to have a real impact on the quality mark
-        quality_mark = quality_mark_derivation * quality_mark_noise
-
         # Adding the Quality Mark to the row of the extremum
-        row_extremum["PeakQuality"] = quality_mark
+        row_extremum["PeakQuality"] = _quality_mark_peak(
+            df,
+            df_derivation_sign,
+            i,
+            row_extremum.index[0],
+            start_window_idx,
+            end_window_idx,
+            dict_quality,
+            derivation_width_idx,
+            half_width_min_idx,
+            name,
+            type_extremum,
+        )
+
         row_extremum["Extremum"] = type_extremum
 
         # Storing the row of the extremum in the DataFrame
         df_peak = pd.concat([df_peak, row_extremum], axis=0)
 
     return df_peak
+
+
+def _quality_mark_peak(
+    df: pd.DataFrame,
+    df_derivation_sign: pd.DataFrame,
+    peak_idx: int,
+    extremum_idx: int,
+    start_window_extraction_idx: int,
+    end_window_extraction_idx: int,
+    dict_quality: dict[str, float],
+    derivation_width_idx: int,
+    half_width_min_idx: int,
+    name: str,
+    type_extremum: str,
+) -> float:
+    """
+    Description :
+
+        Calculating the quality mark of a peak based on three criteria:
+            - The monotony of the derivative (horizon : derivation_width_idx) on the peak window
+            - The monotony of the derivative (horizon : 1) on the quality window (centered on the extremum and of size
+              2*half_width_min_idx) which is more sensible to noise and calculated on a different window
+            - The shape (width and symetry) of the peak on the quality window
+
+    Args:
+
+        df (type: pd.DataFrame) : DataFrame in which the peak should be detected
+        df_derivation_sign (type: pd.DataFrame) : DataFrame with the derivative sign
+        peak_idx (type: int) : Index of the detected peak
+        extremum_idx (type: int) : Index of the actual extremum around the detected peak
+        start_window_extraction_idx (type: int) : Starting index of the extraction window around the detected peak
+        end_window_extraction_idx (type: int) : Starting index of the extraction window around the detected peak
+        dict_quality (type: dict) : Dictionary with index of the peak as key and quality mark of the derivative as value
+        derivation_width_idx (type: int) : Horizon on which the derivation is performed
+        half_width_min_idx (type: int) : Minimum half width of the peak to be detected
+        name (type: str) : Name of the series in which to find the peak
+        type_extremum (type: str) : Type of the extremum ("Max" or "Min")
+
+
+    Returns:
+
+        quality_mark (type: float) : Quality mark associated to the detected peak
+    """
+
+    # Main
+    ######
+    # Derivation quality mark
+    if dict_quality[str(peak_idx)] > 0:
+        quality_mark_derivation = dict_quality[str(peak_idx)]
+    else:
+        if start_window_extraction_idx == peak_idx:
+            mean_sign_derivation_before = df_derivation_sign[peak_idx - 1]
+        else:
+            # Sign of the derivation on the peak detection window
+            mean_sign_derivation_before = df_derivation_sign[
+                (
+                    df_derivation_sign.index
+                    >= start_window_extraction_idx + derivation_width_idx
+                )
+                & (df_derivation_sign.index < peak_idx)
+            ].mean()
+
+        mean_sign_derivation_after = df_derivation_sign[
+            (df_derivation_sign.index >= peak_idx)
+            & (df_derivation_sign.index <= end_window_extraction_idx)
+        ].mean()
+
+        quality_mark_derivation = abs(
+            mean_sign_derivation_before * mean_sign_derivation_after
+        )
+
+    # Window center on the extremum and size 2*half_width_min_idx for the extraction of the quality mark
+    start_window_quality_idx = extremum_idx - half_width_min_idx
+    end_window_quality_idx = extremum_idx + half_width_min_idx
+
+    window_quality_before = pd.Series(
+        df[(df.index >= start_window_quality_idx) & (df.index <= extremum_idx)][name]
+    )
+
+    window_quality_after = pd.Series(
+        df[(df.index >= extremum_idx) & (df.index <= end_window_quality_idx)][name]
+    )
+
+    # Monotony quality mark (heavily affected by noise)
+    mean_sign_derivation_monotony_before = (
+        np.sign(window_quality_before.diff().dropna())
+    ).mean()
+
+    mean_sign_derivation_monotony_after = (
+        np.sign(window_quality_after.diff().dropna())
+    ).mean()
+
+    # The quality metric related to the monotony ranges from 0.75 to 1
+    quality_mark_monotony = 0.75 + 0.25 * abs(
+        mean_sign_derivation_monotony_before * mean_sign_derivation_monotony_after
+    )
+
+    # Shape quality mark
+    extremum = df.loc[extremum_idx, name]
+    max_before = window_quality_before.max()
+    max_after = window_quality_after.max()
+    min_before = window_quality_before.min()
+    min_after = window_quality_after.min()
+
+    if type_extremum == "Max":
+        if (max_before > extremum) or (max_after > extremum):
+            quality_mark_shape_before = 0
+            quality_mark_shape_after = 0
+            quality_mark_shape_half_flatness = 0
+        else:
+            quality_mark_shape_before = (
+                extremum - df.loc[df.index >= start_window_quality_idx, name].iloc[0]
+            ) / (extremum - min_before)
+            quality_mark_shape_after = (
+                extremum - df.loc[df.index <= end_window_quality_idx, name].iloc[-1]
+            ) / (extremum - min_after)
+
+            if min_before < min_after:
+                quality_mark_shape_half_flatness = (extremum - min_after) / (
+                    extremum - min_before
+                )
+            else:
+                quality_mark_shape_half_flatness = (extremum - min_before) / (
+                    extremum - min_after
+                )
+
+    else:
+        if (min_before < extremum) or (min_after < extremum):
+            quality_mark_shape_before = 0
+            quality_mark_shape_after = 0
+            quality_mark_shape_half_flatness = 0
+        else:
+            quality_mark_shape_before = (
+                df.loc[df.index >= start_window_quality_idx, name].iloc[0] - extremum
+            ) / (max_before - extremum)
+            quality_mark_shape_after = (
+                df.loc[df.index <= end_window_quality_idx, name].iloc[-1] - extremum
+            ) / (max_after - extremum)
+
+            if max_before < max_after:
+                quality_mark_shape_half_flatness = (max_before - extremum) / (
+                    max_after - extremum
+                )
+            else:
+                quality_mark_shape_half_flatness = (max_after - extremum) / (
+                    max_before - extremum
+                )
+
+    quality_mark_shape = 0.5 + 0.5 * (
+        quality_mark_shape_before
+        * quality_mark_shape_after
+        * quality_mark_shape_half_flatness
+    )
+
+    return quality_mark_derivation * quality_mark_monotony * quality_mark_shape

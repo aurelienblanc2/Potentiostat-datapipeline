@@ -27,6 +27,7 @@ Modules:
             _non_consecutive_idx
             _find_candidate_extremum
             _extract_row_extremum
+            _quality_mark_peak
 
     types : Types Declaration for the potentiopipe package
         Structures:
