@@ -20,13 +20,6 @@ import pandas as pd
 from potentiopipe.data_processing import process_raw, peak_detection_proc
 
 
-####################
-# - GLOBAL SCOPE - #
-####################
-# TODO : Place Holder until the raw data are also managed by the package
-columns_raw_file = ["Time", "Voltage", "Current", "Cycle", "Dummy", "Reference"]
-
-
 #################
 # - FUNCTIONS - #
 #################
@@ -44,6 +37,7 @@ def process_raw_cli() -> pd.DataFrame:
     Args:
 
         raw_data_stream (type: StringIO) : Stream of raw potentiostat data to be processed
+        columns_name (type: string) : Name of the columns of the raw potentiostat data to be processed
 
     Returns:
 
@@ -54,6 +48,14 @@ def process_raw_cli() -> pd.DataFrame:
     ###################
     # Input stream
     raw_data_stream = sys.argv[1]
+
+    # Columns name
+    if len(sys.argv) > 2:
+        columns_raw_file = []
+        for i in range(2, len(sys.argv)):
+            columns_raw_file.append(sys.argv[i])
+    else:
+        columns_raw_file = ["Time", "Voltage", "Current", "Cycle", "Dummy", "Reference"]
 
     # Checking the inputs
     #####################
