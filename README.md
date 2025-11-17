@@ -44,7 +44,7 @@ pip install .
 # Example of use
 
 ```python
-WRITE HERE 
+in progress
 ```
 
 ---
