@@ -25,7 +25,7 @@ potentiopipe provides:
 
 # Main Functionalities
 
-GO MORE IN DETAILS HERE
+section in progress
 
 ---
 
